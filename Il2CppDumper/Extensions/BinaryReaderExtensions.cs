@@ -75,7 +75,7 @@ namespace Il2CppDumper
                 // Yes we treat UInt32.MaxValue (and Int32.MinValue, see ReadCompressedInt32) specially
                 val = uint.MaxValue;
             } 
-            // Add code
+            // Add code return 0
             else if (read == 0xE8)
             { 
                 val = 0;
