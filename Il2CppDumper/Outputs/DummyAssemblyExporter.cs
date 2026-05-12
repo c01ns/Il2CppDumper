@@ -30,7 +30,7 @@ namespace Il2CppDumper
             {
                 return WriteAssemblyToBytes(assembly);
             }
-            catch (System.ArgumentException ex) when (IsCustomAttributeWriteException(ex))
+            catch (System.Exception ex) when (IsCustomAttributeWriteException(ex))
             {
                 StripRestoredCustomAttributes(assembly);
                 return WriteAssemblyToBytes(assembly);
