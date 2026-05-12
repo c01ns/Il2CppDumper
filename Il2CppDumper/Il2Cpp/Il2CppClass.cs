@@ -43,13 +43,18 @@ namespace Il2CppDumper
         public ulong guidCount;
         [Version(Min = 21, Max = 22)]
         public ulong guids; // Il2CppGuid
-        [Version(Min = 22)]
+        [Version(Min = 22, Max = 27.2)]
+        [Version(Min = 29, Max = 31)]
         public ulong unresolvedVirtualCallCount; //29.1 unresolvedIndirectCallCount;
+        [Version(Min = 35)]
+        public ulong unresolvedIndirectCallCount;
         [Version(Min = 22)]
         public ulong unresolvedVirtualCallPointers;
         [Version(Min = 29.1)]
+        [Version(Min = 35)]
         public ulong unresolvedInstanceCallPointers;
         [Version(Min = 29.1)]
+        [Version(Min = 35)]
         public ulong unresolvedStaticCallPointers;
         [Version(Min = 23)]
         public ulong interopDataCount;

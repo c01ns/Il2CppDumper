@@ -380,6 +380,11 @@ namespace Il2CppDumper
                                         il2Cpp.Position = il2Cpp.MapVATR(refva3 - il2Cpp.PointerSize);
                                         if (il2Cpp.ReadIntPtr() == imageCount)
                                         {
+                                            if (il2Cpp.Version >= 35)
+                                            {
+                                                // v35+ has 16 fields (added UnresolvedInstanceCallWrappers and UnresolvedStaticCallPointers)
+                                                return refva3 - il2Cpp.PointerSize * 16;
+                                            }
                                             if (il2Cpp.Version >= 29)
                                             {
                                                 return refva3 - il2Cpp.PointerSize * 14;

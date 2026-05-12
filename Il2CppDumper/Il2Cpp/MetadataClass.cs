@@ -106,6 +106,72 @@ namespace Il2CppDumper
         public int exportedTypeDefinitionsOffset; // TypeDefinitionIndex
         [Version(Min = 24)]
         public int exportedTypeDefinitionsSize;
+
+        // v38+ metadata sections
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata stringLiterals; // Il2CppStringLiteral
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata stringLiteralData; // uint8_t
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata strings; // const char*
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata events; // Il2CppEventDefinition
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata properties; // Il2CppPropertyDefinition
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata methods; // Il2CppMethodDefinition
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata parameterDefaultValues; // Il2CppParameterDefaultValue
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata fieldDefaultValues; // Il2CppFieldDefaultValue
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata fieldAndParameterDefaultValueData; // uint8_t
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata fieldMarshaledSizes; // Il2CppFieldMarshaledSize
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata parameters; // Il2CppParameterDefinition
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata fields; // Il2CppFieldDefinition
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata genericParameters; // Il2CppGenericParameter
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata genericParameterConstraints; // TypeIndex
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata genericContainers; // Il2_GENERICContainer
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata nestedTypes; // TypeDefinitionIndex
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata interfaces; // TypeIndex
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata vtableMethods; // EncodedMethodIndex
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata interfaceOffsets; // Il2CppInterfaceOffsetPair
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata typeDefinitions; // Il2CppTypeDefinition
+        [Version(Min = 104)]
+        public Il2CppSectionMetadata typeInlineArrays;
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata images; // Il2CppImageDefinition
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata assemblies; // Il2CppAssemblyDefinition
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata fieldRefs; // Il2CppFieldRef
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata referencedAssemblies; // int32_t
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata attributeData; // uint8_t
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata attributeDataRanges; // Il2CppCustomAttributeDataRange
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata unresolvedIndirectCallParameterTypes; // TypeIndex
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata unresolvedIndirectCallParameterRanges; // Il2CppRange
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata windowsRuntimeTypeNames; // Il2CppWindowsRuntimeTypeNamePair
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata windowsRuntimeStrings; // const char*
+        [Version(Min = 38)]
+        public Il2CppSectionMetadata exportedTypeDefinitions; // TypeDefinitionIndex
     }
 
     public class Il2CppAssemblyDefinition
@@ -115,11 +181,15 @@ namespace Il2CppDumper
         public uint token;
         [Version(Max = 24)]
         public int customAttributeIndex;
+        [Version(Min = 24.1)]
+        public int unusedCustomAttributeIndex;
         [Version(Min = 20)]
         public int referencedAssemblyStart;
         [Version(Min = 20)]
         public int referencedAssemblyCount;
         public Il2CppAssemblyNameDefinition aname;
+        [Version(Min = 38)]
+        public uint moduleToken;
     }
 
     public class Il2CppAssemblyNameDefinition
@@ -175,6 +245,7 @@ namespace Il2CppDumper
 
         public int declaringTypeIndex;
         public int parentIndex;
+        [Version(Max = 31)]
         public int elementTypeIndex; // we can probably remove this one. Only used for enums
 
         [Version(Max = 24.1)]
@@ -320,6 +391,7 @@ namespace Il2CppDumper
 
     public class Il2CppStringLiteral
     {
+        [Version(Max = 31)]
         public uint length;
         public int dataIndex;
     }
@@ -416,5 +488,13 @@ namespace Il2CppDumper
     {
         public uint token;
         public uint startOffset;
+    }
+
+    // v38+ metadata section format
+    public class Il2CppSectionMetadata
+    {
+        public int offset;
+        public int sectionSize;
+        public int count;
     }
 }

@@ -16,6 +16,7 @@ namespace Il2CppDumper
         private readonly Metadata metadata;
         private readonly Il2Cpp il2Cpp;
         private readonly Dictionary<Il2CppTypeDefinition, TypeDefinition> typeDefinitionDic = new();
+        private readonly Dictionary<Il2CppTypeDefinition, ModuleDefinition> typeModuleDic = new();
         private readonly Dictionary<Il2CppGenericParameter, GenericParameter> genericParameterDic = new();
         private readonly MethodDefinition attributeAttribute;
         private readonly TypeReference stringType;
@@ -57,10 +58,29 @@ namespace Il2CppDumper
             foreach (var imageDef in metadata.imageDefs)
             {
                 var imageName = metadata.GetStringFromIndex(imageDef.nameIndex);
-                var aname = metadata.assemblyDefs[imageDef.assemblyIndex].aname;
+                if (string.IsNullOrWhiteSpace(imageName))
+                {
+                    imageName = $"Image_{Assemblies.Count}.dll";
+                }
+                var aname = imageDef.assemblyIndex >= 0 && imageDef.assemblyIndex < metadata.assemblyDefs.Length
+                    ? metadata.assemblyDefs[imageDef.assemblyIndex].aname
+                    : new Il2CppAssemblyNameDefinition();
                 var assemblyName = metadata.GetStringFromIndex(aname.nameIndex);
+                var imageAssemblyName = Path.GetFileNameWithoutExtension(imageName);
+                if (metadata.Version >= 38 && !string.IsNullOrWhiteSpace(imageAssemblyName))
+                {
+                    assemblyName = imageAssemblyName;
+                }
+                if (string.IsNullOrWhiteSpace(assemblyName))
+                {
+                    assemblyName = imageAssemblyName;
+                    if (string.IsNullOrWhiteSpace(assemblyName))
+                    {
+                        assemblyName = $"Assembly_{Assemblies.Count}";
+                    }
+                }
                 Version vers;
-                if (aname.build >= 0)
+                if (aname.major >= 0 && aname.minor >= 0 && aname.build >= 0 && aname.revision >= 0)
                 {
                     vers = new Version(aname.major, aname.minor, aname.build, aname.revision);
                 }
@@ -88,6 +108,7 @@ namespace Il2CppDumper
                     var typeName = metadata.GetStringFromIndex(typeDef.nameIndex);
                     var typeDefinition = new TypeDefinition(namespaceName, typeName, (TypeAttributes)typeDef.flags);
                     typeDefinitionDic.Add(typeDef, typeDefinition);
+                    typeModuleDic[typeDef] = moduleDefinition;
                     if (typeDef.declaringTypeIndex == -1)
                     {
                         moduleDefinition.Types.Add(typeDefinition);
@@ -105,11 +126,27 @@ namespace Il2CppDumper
                     //nestedtype
                     for (int i = 0; i < typeDef.nested_type_count; i++)
                     {
-                        var nestedIndex = metadata.nestedTypeIndices[typeDef.nestedTypesStart + i];
+                        var nestedTypeIndex = typeDef.nestedTypesStart + i;
+                        if (nestedTypeIndex < 0 || nestedTypeIndex >= metadata.nestedTypeIndices.Length)
+                        {
+                            continue;
+                        }
+                        var nestedIndex = metadata.nestedTypeIndices[nestedTypeIndex];
+                        if (nestedIndex < 0 || nestedIndex >= metadata.typeDefs.Length)
+                        {
+                            continue;
+                        }
                         var nestedTypeDef = metadata.typeDefs[nestedIndex];
                         var nestedTypeDefinition = typeDefinitionDic[nestedTypeDef];
-                        typeDefinition.NestedTypes.Add(nestedTypeDefinition);
+                        AttachNestedType(typeDefinition, nestedTypeDefinition);
                     }
+                }
+            }
+            foreach (var pair in typeDefinitionDic)
+            {
+                if (pair.Value.Module == null && typeModuleDic.TryGetValue(pair.Key, out var moduleDefinition))
+                {
+                    moduleDefinition.Types.Add(pair.Value);
                 }
             }
             //提前处理
@@ -192,14 +229,14 @@ namespace Il2CppDumper
                         {
                             if (executor.TryGetDefaultValue(fieldDefault.typeIndex, fieldDefault.dataIndex, out var value))
                             {
-                                fieldDefinition.Constant = value;
+                                if (!TrySetConstant(fieldDefinition, fieldDefinition.FieldType, value))
+                                {
+                                    AddMetadataOffsetAttribute(typeDefinition.Module, metadataOffsetAttribute, fieldDefinition.CustomAttributes, metadata.GetDefaultValueFromIndex(fieldDefault.dataIndex));
+                                }
                             }
                             else
                             {
-                                var customAttribute = new CustomAttribute(typeDefinition.Module.ImportReference(metadataOffsetAttribute));
-                                var offset = new CustomAttributeNamedArgument("Offset", new CustomAttributeArgument(stringType, $"0x{value:X}"));
-                                customAttribute.Fields.Add(offset);
-                                fieldDefinition.CustomAttributes.Add(customAttribute);
+                                AddMetadataOffsetAttribute(typeDefinition.Module, metadataOffsetAttribute, fieldDefinition.CustomAttributes, (uint)value);
                             }
                         }
                         //fieldOffset
@@ -287,14 +324,14 @@ namespace Il2CppDumper
                             {
                                 if (executor.TryGetDefaultValue(parameterDefault.typeIndex, parameterDefault.dataIndex, out var value))
                                 {
-                                    parameterDefinition.Constant = value;
+                                    if (!TrySetConstant(parameterDefinition, parameterDefinition.ParameterType, value))
+                                    {
+                                        AddMetadataOffsetAttribute(typeDefinition.Module, metadataOffsetAttribute, parameterDefinition.CustomAttributes, metadata.GetDefaultValueFromIndex(parameterDefault.dataIndex));
+                                    }
                                 }
                                 else
                                 {
-                                    var customAttribute = new CustomAttribute(typeDefinition.Module.ImportReference(metadataOffsetAttribute));
-                                    var offset = new CustomAttributeNamedArgument("Offset", new CustomAttributeArgument(stringType, $"0x{value:X}"));
-                                    customAttribute.Fields.Add(offset);
-                                    parameterDefinition.CustomAttributes.Add(customAttribute);
+                                    AddMetadataOffsetAttribute(typeDefinition.Module, metadataOffsetAttribute, parameterDefinition.CustomAttributes, (uint)value);
                                 }
                             }
                         }
@@ -448,6 +485,82 @@ namespace Il2CppDumper
             }
         }
 
+        private static void AttachNestedType(TypeDefinition declaringType, TypeDefinition nestedType)
+        {
+            if (declaringType == null || nestedType == null || ReferenceEquals(declaringType, nestedType))
+            {
+                return;
+            }
+            if (nestedType.DeclaringType == declaringType || declaringType.NestedTypes.Contains(nestedType))
+            {
+                return;
+            }
+            if (nestedType.DeclaringType != null)
+            {
+                return;
+            }
+            nestedType.Module?.Types.Remove(nestedType);
+            declaringType.NestedTypes.Add(nestedType);
+        }
+
+        private void AddMetadataOffsetAttribute(ModuleDefinition moduleDefinition, MethodReference metadataOffsetAttribute, Collection<CustomAttribute> customAttributes, uint metadataOffset)
+        {
+            var customAttribute = new CustomAttribute(moduleDefinition.ImportReference(metadataOffsetAttribute));
+            var offset = new CustomAttributeNamedArgument("Offset", new CustomAttributeArgument(stringType, $"0x{metadataOffset:X}"));
+            customAttribute.Fields.Add(offset);
+            customAttributes.Add(customAttribute);
+        }
+
+        private static bool TrySetConstant(FieldDefinition fieldDefinition, TypeReference typeReference, object value)
+        {
+            if (!CanWriteConstant(typeReference))
+            {
+                return false;
+            }
+            fieldDefinition.Constant = value;
+            return true;
+        }
+
+        private static bool TrySetConstant(ParameterDefinition parameterDefinition, TypeReference typeReference, object value)
+        {
+            if (!CanWriteConstant(typeReference))
+            {
+                return false;
+            }
+            parameterDefinition.Constant = value;
+            return true;
+        }
+
+        private static bool CanWriteConstant(TypeReference typeReference)
+        {
+            if (typeReference == null)
+            {
+                return false;
+            }
+            if (IsPrimitiveConstantType(typeReference.FullName))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        private static bool IsPrimitiveConstantType(string fullName)
+        {
+            return fullName is "System.Boolean"
+                or "System.Char"
+                or "System.SByte"
+                or "System.Byte"
+                or "System.Int16"
+                or "System.UInt16"
+                or "System.Int32"
+                or "System.UInt32"
+                or "System.Int64"
+                or "System.UInt64"
+                or "System.Single"
+                or "System.Double"
+                or "System.String";
+        }
+
         private TypeReference GetTypeReferenceWithByRef(MemberReference memberReference, Il2CppType il2CppType)
         {
             var typeReference = GetTypeReference(memberReference, il2CppType);
@@ -594,7 +707,9 @@ namespace Il2CppDumper
                     {
                         var startRange = metadata.attributeDataRanges[attributeIndex];
                         var endRange = metadata.attributeDataRanges[attributeIndex + 1];
-                        metadata.Position = metadata.header.attributeDataOffset + startRange.startOffset;
+                        metadata.Position = (ulong)(metadata.Version >= 38
+                            ? metadata.header.attributeData.offset + startRange.startOffset
+                            : metadata.header.attributeDataOffset + startRange.startOffset);
                         var buff = metadata.ReadBytes((int)(endRange.startOffset - startRange.startOffset));
                         var reader = new CustomAttributeDataReader(executor, buff);
                         if (reader.Count != 0)
