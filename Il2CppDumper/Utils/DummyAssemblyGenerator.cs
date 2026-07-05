@@ -65,29 +65,22 @@ namespace Il2CppDumper
                 var aname = imageDef.assemblyIndex >= 0 && imageDef.assemblyIndex < metadata.assemblyDefs.Length
                     ? metadata.assemblyDefs[imageDef.assemblyIndex].aname
                     : new Il2CppAssemblyNameDefinition();
-                var assemblyName = metadata.GetStringFromIndex(aname.nameIndex);
+                var metadataAssemblyName = metadata.GetStringFromIndex(aname.nameIndex);
                 var imageAssemblyName = Path.GetFileNameWithoutExtension(imageName);
-                if (metadata.Version >= 38 && !string.IsNullOrWhiteSpace(imageAssemblyName))
-                {
-                    assemblyName = imageAssemblyName;
-                }
+                var assemblyName = !string.IsNullOrWhiteSpace(imageAssemblyName) ? imageAssemblyName : metadataAssemblyName;
                 if (string.IsNullOrWhiteSpace(assemblyName))
                 {
-                    assemblyName = imageAssemblyName;
-                    if (string.IsNullOrWhiteSpace(assemblyName))
-                    {
-                        assemblyName = $"Assembly_{Assemblies.Count}";
-                    }
+                    assemblyName = $"Assembly_{Assemblies.Count}";
                 }
+                var useMetadataAssemblyInfo = string.Equals(metadataAssemblyName, assemblyName, StringComparison.OrdinalIgnoreCase);
                 Version vers;
-                if (aname.major >= 0 && aname.minor >= 0 && aname.build >= 0 && aname.revision >= 0)
+                if (useMetadataAssemblyInfo && aname.major >= 0 && aname.minor >= 0 && aname.build >= 0 && aname.revision >= 0)
                 {
                     vers = new Version(aname.major, aname.minor, aname.build, aname.revision);
                 }
                 else
                 {
-                    //__Generated
-                    vers = new Version(3, 7, 1, 6);
+                    vers = new Version(0, 0, 0, 0);
                 }
                 var assemblyNameDef = new AssemblyNameDefinition(assemblyName, vers);
                 /*assemblyNameDef.Culture = metadata.GetStringFromIndex(aname.cultureIndex);
