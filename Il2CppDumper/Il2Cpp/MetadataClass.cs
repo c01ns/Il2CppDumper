@@ -210,7 +210,7 @@ namespace Il2CppDumper
         [Version(Min = 20)]
         public int referencedAssemblyCount;
         public Il2CppAssemblyNameDefinition aname;
-        [Version(Min = 38)]
+        [Version(Min = 38, Max = 38)]
         public uint moduleToken;
     }
 

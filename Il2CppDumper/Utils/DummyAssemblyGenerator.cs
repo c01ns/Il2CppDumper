@@ -175,7 +175,9 @@ namespace Il2CppDumper
                     if (typeDef.parentIndex >= 0)
                     {
                         var parentType = il2Cpp.types[typeDef.parentIndex];
-                        var parentTypeRef = GetTypeReference(typeDefinition, parentType);
+                        var parentTypeRef = IsEnumUnderlyingType(parentType.type)
+                            ? typeDefinition.Module.ImportReference(typeof(Enum))
+                            : GetTypeReference(typeDefinition, parentType);
                         typeDefinition.BaseType = parentTypeRef;
                     }
 
@@ -663,6 +665,20 @@ namespace Il2CppDumper
                 default:
                     throw new NotSupportedException();
             }
+        }
+
+        private static bool IsEnumUnderlyingType(Il2CppTypeEnum type)
+        {
+            return type is Il2CppTypeEnum.IL2CPP_TYPE_BOOLEAN
+                or Il2CppTypeEnum.IL2CPP_TYPE_CHAR
+                or Il2CppTypeEnum.IL2CPP_TYPE_I1
+                or Il2CppTypeEnum.IL2CPP_TYPE_U1
+                or Il2CppTypeEnum.IL2CPP_TYPE_I2
+                or Il2CppTypeEnum.IL2CPP_TYPE_U2
+                or Il2CppTypeEnum.IL2CPP_TYPE_I4
+                or Il2CppTypeEnum.IL2CPP_TYPE_U4
+                or Il2CppTypeEnum.IL2CPP_TYPE_I8
+                or Il2CppTypeEnum.IL2CPP_TYPE_U8;
         }
 
         private void CreateCustomAttribute(Il2CppImageDefinition imageDef, int customAttributeIndex, uint token, ModuleDefinition moduleDefinition, Collection<CustomAttribute> customAttributes)
