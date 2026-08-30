@@ -526,7 +526,7 @@ namespace Il2CppDumper
             return true;
         }
 
-        private static bool CanWriteConstant(TypeReference typeReference)
+        internal static bool CanWriteConstant(TypeReference typeReference)
         {
             if (typeReference == null)
             {
@@ -536,7 +536,19 @@ namespace Il2CppDumper
             {
                 return true;
             }
-            return false;
+            return IsEnumWithPrimitiveUnderlyingType(typeReference);
+        }
+
+        private static bool IsEnumWithPrimitiveUnderlyingType(TypeReference typeReference)
+        {
+            var typeDefinition = typeReference as TypeDefinition;
+            if (typeDefinition == null || !typeDefinition.IsEnum)
+            {
+                return false;
+            }
+            var underlyingType = typeDefinition.Fields
+                .FirstOrDefault(x => !x.IsStatic && x.Name == "value__")?.FieldType;
+            return underlyingType != null && IsPrimitiveConstantType(underlyingType.FullName);
         }
 
         private static bool IsPrimitiveConstantType(string fullName)

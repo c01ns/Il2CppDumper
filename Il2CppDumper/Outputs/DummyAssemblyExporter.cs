@@ -537,19 +537,7 @@ namespace Il2CppDumper
 
         private static bool CanWriteConstant(TypeReference typeReference)
         {
-            return typeReference?.FullName is "System.Boolean"
-                or "System.Char"
-                or "System.SByte"
-                or "System.Byte"
-                or "System.Int16"
-                or "System.UInt16"
-                or "System.Int32"
-                or "System.UInt32"
-                or "System.Int64"
-                or "System.UInt64"
-                or "System.Single"
-                or "System.Double"
-                or "System.String";
+            return DummyAssemblyGenerator.CanWriteConstant(typeReference);
         }
     }
 }
