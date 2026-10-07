@@ -130,3 +130,4 @@ If you have a rooted Android phone, you can try my other project [Zygisk-Il2CppD
 ## Credits
 
 - Jumboperson - [Il2CppDumper](https://github.com/Jumboperson/Il2CppDumper)
+- Il2CppInspectorRedux contributors - [Il2CppInspectorRedux](https://github.com/LukeFZ/Il2CppInspectorRedux)

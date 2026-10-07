@@ -124,3 +124,4 @@ Il2CppDumper检测到可执行文件已被保护，使用`GameGuardian`从游戏
 ## 感谢
 
 - Jumboperson - [Il2CppDumper](https://github.com/Jumboperson/Il2CppDumper)
+- Il2CppInspectorRedux 贡献者 - [Il2CppInspectorRedux](https://github.com/LukeFZ/Il2CppInspectorRedux)
