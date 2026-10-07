@@ -171,10 +171,10 @@ namespace Il2CppDumper
                 ? ReadMetadataClassArray<Il2CppPropertyDefinition>(header.properties)
                 : ReadMetadataClassArray<Il2CppPropertyDefinition>(header.propertiesOffset, header.propertiesSize);
             interfaceIndices = Version >= 38
-                ? ReadMetadataIndexArray(header.interfaces, typeIndexSize)
+                ? ReadMetadataIndexArray(header.interfaces, GetSectionItemSize(header.interfaces, typeIndexSize))
                 : ReadClassArray<int>(header.interfacesOffset, header.interfacesSize / 4);
             nestedTypeIndices = Version >= 38
-                ? ReadMetadataIndexArray(header.nestedTypes, typeDefinitionIndexSize)
+                ? ReadMetadataIndexArray(header.nestedTypes, GetSectionItemSize(header.nestedTypes, typeDefinitionIndexSize))
                 : ReadClassArray<int>(header.nestedTypesOffset, header.nestedTypesSize / 4);
             eventDefs = Version >= 38
                 ? ReadMetadataClassArray<Il2CppEventDefinition>(header.events)
@@ -186,7 +186,9 @@ namespace Il2CppDumper
                 ? ReadMetadataClassArray<Il2CppGenericParameter>(header.genericParameters)
                 : ReadMetadataClassArray<Il2CppGenericParameter>(header.genericParametersOffset, header.genericParametersSize);
             constraintIndices = Version >= 38
-                ? ReadMetadataIndexArray(header.genericParameterConstraints, typeIndexSize)
+                ? ReadMetadataIndexArray(
+                    header.genericParameterConstraints,
+                    GetSectionItemSize(header.genericParameterConstraints, typeIndexSize))
                 : ReadClassArray<int>(header.genericParameterConstraintsOffset, header.genericParameterConstraintsSize / 4);
             vtableMethods = Version >= 38
                 ? ReadClassArray<uint>((uint)header.vtableMethods.offset, header.vtableMethods.count)
@@ -279,11 +281,56 @@ namespace Il2CppDumper
 
         private T[] ReadMetadataClassArray<T>(Il2CppSectionMetadata section) where T : new()
         {
+            if (typeof(T) == typeof(Il2CppAssemblyDefinition))
+            {
+                return (T[])(object)ReadAssemblyDefinitions(section);
+            }
+
             Position = (ulong)section.offset;
             var result = new T[section.count];
             for (var i = 0; i < result.Length; i++)
             {
                 result[i] = ReadMetadataClass<T>();
+            }
+            return result;
+        }
+
+        private Il2CppAssemblyDefinition[] ReadAssemblyDefinitions(Il2CppSectionMetadata section)
+        {
+            Position = (ulong)section.offset;
+            var result = new Il2CppAssemblyDefinition[section.count];
+
+            // v39 samples differ in whether the trailing moduleToken is present.
+            // The section item size is authoritative for this layout detail.
+            var itemSize = GetSectionItemSize(section, 0);
+            var assemblySizeWithoutModuleToken = 20 + SizeOf(typeof(Il2CppAssemblyNameDefinition));
+            var hasModuleToken = Version >= 38 && itemSize >= assemblySizeWithoutModuleToken + sizeof(uint);
+
+            for (var i = 0; i < result.Length; i++)
+            {
+                result[i] = new Il2CppAssemblyDefinition
+                {
+                    imageIndex = ReadInt32()
+                };
+                if (Version >= 24.1)
+                {
+                    result[i].token = ReadUInt32();
+                    result[i].unusedCustomAttributeIndex = ReadInt32();
+                }
+                else
+                {
+                    result[i].customAttributeIndex = ReadInt32();
+                }
+                if (Version >= 20)
+                {
+                    result[i].referencedAssemblyStart = ReadInt32();
+                    result[i].referencedAssemblyCount = ReadInt32();
+                }
+                result[i].aname = ReadClass<Il2CppAssemblyNameDefinition>();
+                if (hasModuleToken)
+                {
+                    result[i].moduleToken = ReadUInt32();
+                }
             }
             return result;
         }
@@ -398,10 +445,6 @@ namespace Il2CppDumper
         {
             static int GetIndexSize(int count) => count <= byte.MaxValue ? 1 : count <= ushort.MaxValue ? 2 : 4;
             static int GetV108IndexSize(int count) => count < byte.MaxValue ? 1 : count < ushort.MaxValue ? 2 : 4;
-            static int GetSectionItemSize(Il2CppSectionMetadata section, int fallback)
-            {
-                return section != null && section.count > 0 ? section.sectionSize / section.count : fallback;
-            }
 
             typeDefinitionIndexSize = GetIndexSize(header.typeDefinitions.count);
             genericContainerIndexSize = GetIndexSize(header.genericContainers.count);
@@ -450,6 +493,11 @@ namespace Il2CppDumper
                 if (methodPointerTableIndexSize != 1 && methodPointerTableIndexSize != 2 && methodPointerTableIndexSize != 4)
                     methodPointerTableIndexSize = 4;
             }
+        }
+
+        private static int GetSectionItemSize(Il2CppSectionMetadata section, int fallback)
+        {
+            return section != null && section.count > 0 ? section.sectionSize / section.count : fallback;
         }
 
         private int[] ReadMetadataIndexArray(Il2CppSectionMetadata section, int indexSize)

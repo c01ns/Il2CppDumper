@@ -485,6 +485,23 @@ namespace Il2CppDumper
             }
         }
 
+        private Il2CppTypeEnum GetEnumUnderlyingTypeEnum(Il2CppTypeDefinition typeDef)
+        {
+            if (metadata.Version <= 31)
+            {
+                return il2Cpp.types[typeDef.elementTypeIndex].type;
+            }
+            for (var i = 0; i < typeDef.field_count; i++)
+            {
+                var fieldDef = metadata.fieldDefs[typeDef.fieldStart + i];
+                if (metadata.GetStringFromIndex(fieldDef.nameIndex) == "value__")
+                {
+                    return il2Cpp.types[fieldDef.typeIndex].type;
+                }
+            }
+            return Il2CppTypeEnum.IL2CPP_TYPE_I4;
+        }
+
         public Il2CppTypeEnum ReadEncodedTypeEnum(BinaryReader reader, out Il2CppType enumType)
         {
             enumType = null;
@@ -494,7 +511,7 @@ namespace Il2CppDumper
                 var enumTypeIndex = reader.ReadCompressedInt32();
                 enumType = il2Cpp.types[enumTypeIndex];
                 var typeDef = GetTypeDefinitionFromIl2CppType(enumType);
-                type = il2Cpp.types[typeDef.elementTypeIndex].type;
+                type = GetEnumUnderlyingTypeEnum(typeDef);
             }
             return type;
         }

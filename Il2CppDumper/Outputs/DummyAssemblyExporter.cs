@@ -309,7 +309,31 @@ namespace Il2CppDumper
             {
                 return ConvertEnumValue(underlyingType, value);
             }
+            if (IsUnresolvedNonPrimitive(type))
+            {
+                throw new System.InvalidOperationException($"Cannot resolve custom attribute argument type {type?.FullName}.");
+            }
             return value;
+        }
+
+        private static bool IsUnresolvedNonPrimitive(TypeReference type)
+        {
+            if (type == null || type.IsPrimitive || type.IsArray)
+            {
+                return false;
+            }
+            if (type.FullName is "System.String" or "System.Type" or "System.Object")
+            {
+                return false;
+            }
+            try
+            {
+                return (type as TypeDefinition ?? type.Resolve()) == null;
+            }
+            catch
+            {
+                return true;
+            }
         }
 
         private static bool TryGetEnumUnderlyingType(TypeReference type, out TypeReference underlyingType)
@@ -513,19 +537,7 @@ namespace Il2CppDumper
 
         private static bool CanWriteConstant(TypeReference typeReference)
         {
-            return typeReference?.FullName is "System.Boolean"
-                or "System.Char"
-                or "System.SByte"
-                or "System.Byte"
-                or "System.Int16"
-                or "System.UInt16"
-                or "System.Int32"
-                or "System.UInt32"
-                or "System.Int64"
-                or "System.UInt64"
-                or "System.Single"
-                or "System.Double"
-                or "System.String";
+            return DummyAssemblyGenerator.CanWriteConstant(typeReference);
         }
     }
 }
