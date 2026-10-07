@@ -90,6 +90,23 @@ namespace Il2CppDumper
             if (Version >= 38)
             {
                 header = ReadMetadataHeaderV38();
+
+                // Unity 6000.5 introduced builds which report metadata version 107,
+                // while keeping the pre-v107 metadata usage layout. Detect those
+                // files before deriving the version-dependent index widths.
+                if (Version == 107 && header.vtableMethods != null && header.vtableMethods.count > 1)
+                {
+                    var savedPosition = Position;
+                    Position = (ulong)header.vtableMethods.offset;
+                    var firstVTableMethodIndex = ReadUInt32();
+                    if (GetEncodedIndexTypeForVersion(firstVTableMethodIndex) ==
+                        (uint)Il2CppMetadataUsage.kIl2CppMetadataUsageFieldInfo)
+                    {
+                        Version = 106;
+                    }
+                    Position = savedPosition;
+                }
+
                 SetupMetadataIndexSizes();
                 imageDefs = ReadMetadataClassArray<Il2CppImageDefinition>(header.images);
                 assemblyDefs = ReadMetadataClassArray<Il2CppAssemblyDefinition>(header.assemblies);
@@ -379,7 +396,8 @@ namespace Il2CppDumper
 
         private void SetupMetadataIndexSizes()
         {
-            static int GetIndexSize(int count) => count < byte.MaxValue ? 1 : count < ushort.MaxValue ? 2 : 4;
+            static int GetIndexSize(int count) => count <= byte.MaxValue ? 1 : count <= ushort.MaxValue ? 2 : 4;
+            static int GetV108IndexSize(int count) => count < byte.MaxValue ? 1 : count < ushort.MaxValue ? 2 : 4;
             static int GetSectionItemSize(Il2CppSectionMetadata section, int fallback)
             {
                 return section != null && section.count > 0 ? section.sectionSize / section.count : fallback;
@@ -416,19 +434,19 @@ namespace Il2CppDumper
             if (Version >= 108)
             {
                 var methodSpecCount = header.methodSpecsOnGenericType.count + header.genericMethodSpecsOnType.count + header.methodSpecs.count;
-                genericMethodIndexSize = GetIndexSize(methodSpecCount);
-                invokerTableIndexSize = GetSectionItemSize(header.invokerIndices, GetIndexSize(header.invokerIndices.count));
-                adjustorThunkIndexSize = GetIndexSize(header.genericMethodFunctionsDefinitionsWithAdjustor.count);
+                genericMethodIndexSize = GetV108IndexSize(methodSpecCount);
+                invokerTableIndexSize = GetSectionItemSize(header.invokerIndices, GetV108IndexSize(header.invokerIndices.count));
+                adjustorThunkIndexSize = GetV108IndexSize(header.genericMethodFunctionsDefinitionsWithAdjustor.count);
                 var genericMethodSpecOnTypeSize = GetSectionItemSize(header.genericMethodSpecsOnType, 0);
                 var methodSpecOnGenericTypeSize = GetSectionItemSize(header.methodSpecsOnGenericType, 0);
-                genericInstIndexSize = (genericMethodSpecOnTypeSize > 0 ? genericMethodSpecOnTypeSize : methodSpecOnGenericTypeSize) - methodIndexSize;
+                genericInstIndexSize = (genericMethodSpecOnTypeSize > 0 ? genericMethodSpecOnTypeSize : methodSpecOnGenericTypeSize)
+                    - GetV108IndexSize(header.methods.count);
                 if (genericInstIndexSize != 1 && genericInstIndexSize != 2 && genericInstIndexSize != 4)
                     genericInstIndexSize = 4;
                 var genericMethodFunctionsWithAdjustorSize = GetSectionItemSize(header.genericMethodFunctionsDefinitionsWithAdjustor, 0);
-                var genericMethodFunctionsSize = GetSectionItemSize(header.genericMethodFunctionsDefinitions, 0);
                 methodPointerTableIndexSize = genericMethodFunctionsWithAdjustorSize > 0
                     ? genericMethodFunctionsWithAdjustorSize - (genericMethodIndexSize + invokerTableIndexSize + adjustorThunkIndexSize)
-                    : genericMethodFunctionsSize - (genericMethodIndexSize + invokerTableIndexSize);
+                    : 4;
                 if (methodPointerTableIndexSize != 1 && methodPointerTableIndexSize != 2 && methodPointerTableIndexSize != 4)
                     methodPointerTableIndexSize = 4;
             }
@@ -653,8 +671,11 @@ namespace Il2CppDumper
             genericMethodIndex = ReadMetadataIndex(genericMethodIndexSize),
             indices = new Il2CppGenericMethodIndices
             {
-                methodIndex = ReadMetadataIndex(methodPointerTableIndexSize),
-                invokerIndex = ReadMetadataIndex(invokerTableIndexSize)
+                // This nested structure is a binary type in Unity's v108+ format.
+                // Its two members remain signed 32-bit values even though the
+                // surrounding metadata structures use variable-width indices.
+                methodIndex = ReadInt32(),
+                invokerIndex = ReadInt32()
             }
         };
 
@@ -1002,7 +1023,7 @@ namespace Il2CppDumper
                 if (type == typeof(Il2CppMethodSpec))
                     return methodIndexSize + genericInstIndexSize + genericInstIndexSize;
                 if (type == typeof(Il2CppGenericMethodFunctionsDefinitions))
-                    return genericMethodIndexSize + methodPointerTableIndexSize + invokerTableIndexSize;
+                    return genericMethodIndexSize + 4 + 4;
                 if (type == typeof(Il2CppGenericMethodFunctionsDefinitionsWithAdjustor))
                     return genericMethodIndexSize + methodPointerTableIndexSize + invokerTableIndexSize + adjustorThunkIndexSize;
                 if (type == typeof(Il2CppGeneratedMethodTypeInfo))

@@ -463,10 +463,6 @@ namespace Il2CppDumper
         {
             if (Version >= 24.2)
             {
-                if (methodDef.methodIndex < 0)
-                {
-                    return 0;
-                }
                 var methodToken = methodDef.token;
                 if (!TryGetModuleMethodPointers(imageName, out var ptrs))
                 {
