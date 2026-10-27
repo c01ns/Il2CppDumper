@@ -299,6 +299,17 @@ namespace Il2CppDumper
             return metadata.typeDefs[genericClass.typeDefinitionIndex];
         }
 
+        public Il2CppTypeDefinition GetTypeDefinitionFromTypeIndex(uint typeIndex)
+        {
+            var il2CppType = il2Cpp.types[typeIndex];
+            if (il2CppType.type == Il2CppTypeEnum.IL2CPP_TYPE_GENERICINST)
+            {
+                var genericClass = il2Cpp.MapVATR<Il2CppGenericClass>(il2CppType.data.generic_class);
+                return GetGenericClassTypeDefinition(genericClass);
+            }
+            return GetTypeDefinitionFromIl2CppType(il2CppType);
+        }
+
         public Il2CppTypeDefinition GetTypeDefinitionFromIl2CppType(Il2CppType il2CppType)
         {
             if (il2Cpp.Version >= 27 && il2Cpp.IsDumped)
